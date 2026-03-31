@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CardioSense — Heart Disease Prediction</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg: #0a0a0f;
+    --bg2: #0f0f1a;
+    --surface: rgba(255,255,255,0.04);
+    --surface-hover: rgba(255,255,255,0.07);
+    --border: rgba(255,255,255,0.08);
+    --border-focus: rgba(239,68,68,0.6);
+    --text: #f0eeff;
+    --text-muted: rgba(240,238,255,0.45);
+    --accent: #ef4444;
+    --accent2: #f97316;
+    --accent-glow: rgba(239,68,68,0.3);
+    --card-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05);
+    --input-bg: rgba(255,255,255,0.05);
+    --label: rgba(240,238,255,0.6);
+    --toggle-bg: rgba(255,255,255,0.1);
+    --result-bg: rgba(239,68,68,0.08);
+  }
+  :root[data-theme="light"] {
+    --bg: #fef2f2;
+    --bg2: #fff5f5;
+    --surface: rgba(255,255,255,0.9);
+    --surface-hover: rgba(255,255,255,1);
+    --border: rgba(239,68,68,0.15);
+    --border-focus: rgba(239,68,68,0.5);
+    --text: #1a0a0a;
+    --text-muted: rgba(26,10,10,0.5);
+    --accent: #dc2626;
+    --accent2: #ea580c;
+    --accent-glow: rgba(239,68,68,0.2);
+    --card-shadow: 0 32px 80px rgba(220,38,38,0.15), 0 0 0 1px rgba(239,68,68,0.1);
+    --input-bg: rgba(255,255,255,0.8);
+    --label: rgba(26,10,10,0.55);
+    --toggle-bg: rgba(220,38,38,0.1);
+    --result-bg: rgba(239,68,68,0.06);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    transition: background 0.4s ease, color 0.4s ease;
+  }
+
+  #heartCanvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.55;
+  }
+
+  .page-wrap {
+    position: relative;
+    z-index: 2;
+    padding: 40px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .topbar {
+    width: 100%;
+    max-width: 620px;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+  .brand-name { font-family: 'Syne'; font-weight: 800; font-size: 1.25rem; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+  /* Toggle - Switch right for Dark (default) */
+  .toggle {
+    width: 52px; height: 28px;
+    background: var(--toggle-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    cursor: pointer; position: relative;
+  }
+  .toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    transition: transform 0.3s;
+    transform: translateX(24px); /* Default Dark */
+  }
+  [data-theme="light"] .toggle::after { transform: translateX(0); }
+
+  .card {
+    width: 100%; max-width: 620px;
+    background: var(--surface);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 24px; padding: 40px;
+    box-shadow: var(--card-shadow);
+  }
+
+  .card-title { font-family: 'Syne'; font-size: 1.8rem; font-weight: 800; text-align: center; }
+  .card-title span { color: var(--accent); background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 25px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--label); }
+  
+  .field input, .field select {
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    padding: 12px; border-radius: 10px;
+    color: var(--text); font-family: inherit;
+  }
+
+  .field select option { background: var(--bg2); color: var(--text); }
+
+  .btn-predict {
+    width: 100%; margin-top: 25px; padding: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white; border: none; border-radius: 12px;
+    font-family: 'Syne'; font-weight: 700; cursor: pointer;
+    box-shadow: 0 8px 20px var(--accent-glow);
+  }
+
+  .result {
+    margin-top: 20px; padding: 15px;
+    background: var(--result-bg);
+    border: 1px solid var(--accent);
+    border-radius: 10px; color: var(--accent);
+    text-align: center; font-weight: 700;
+    display: none; /* Hidden unless .show is added */
+  }
+  .result.show { display: block; animation: fadeUp 0.4s ease; }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 500px) { .form-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<canvas id="heartCanvas"></canvas>
+
+<div class="page-wrap">
+  <nav class="topbar">
+    <div class="brand">
+      <div class="brand-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z"/></svg></div>
+      <span class="brand-name">CardioSense</span>
+    </div>
+    <div class="toggle-wrap">
+      <button class="toggle" id="themeToggle" aria-label="Toggle theme"></button>
+    </div>
+  </nav>
+
+  <div class="card">
+    <h1 class="card-title">Heart Disease <span>Prediction</span></h1>
+    
+    <form action="/predict" method="POST">
+      <div class="form-grid">
+        <div class="field"><label>Age</label><input type="number" name="age" required></div>
+        <div class="field">
+          <label>Sex</label>
+          <select name="sex" required>
+            <option value="1">Male</option>
+            <option value="0">Female</option>
+          </select>
+        </div>
+        <div class="field">
+            <label>Chest Pain</label>
+            <select name="chest_pain" required>
+                <option value="1">Typical Angina</option>
+                <option value="2">Atypical Angina</option>
+                <option value="3">Non-Anginal</option>
+                <option value="4">Asymptomatic</option>
+            </select>
+        </div>
+        <div class="field"><label>BP (mmHg)</label><input type="number" name="bp" required></div>
+        <div class="field"><label>Cholesterol</label><input type="number" name="cholesterol" required></div>
+        <div class="field">
+            <label>EKG</label>
+            <select name="ekg" required>
+                <option value="0">Normal</option>
+                <option value="1">ST-T Abnormality</option>
+                <option value="2">LV Hypertrophy</option>
+            </select>
+        </div>
+        <div class="field"><label>Max HR</label><input type="number" name="max_hr" required></div>
+        <div class="field">
+            <label>Ex. Angina</label>
+            <select name="exercise_angina" required>
+                <option value="1">Yes</option>
+                <option value="0">No</option>
+            </select>
+        </div>
+        <div class="field"><label>ST Depress</label><input type="number" step="0.1" name="st_depression" required></div>
+        <div class="field">
+            <label>Slope</label>
+            <select name="slope" required>
+                <option value="1">Upsloping</option>
+                <option value="2">Flat</option>
+                <option value="3">Downsloping</option>
+            </select>
+        </div>
+        <div class="field"><label>Vessels (0-3)</label><input type="number" name="vessels" min="0" max="3" required></div>
+        <div class="field">
+            <label>Thallium</label>
+            <select name="thallium" required>
+                <option value="3">Normal</option>
+                <option value="6">Fixed</option>
+                <option value="7">Reversible</option>
+            </select>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-predict">Analyze Cardiac Risk</button>
+
+      {% if prediction_text %}
+      <div class="result show" id="resultBox">
+        {{ prediction_text }}
+      </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<script>
+  // Theme Toggle Logic
+  const toggle = document.getElementById('themeToggle');
+  const root = document.documentElement;
+
+  toggle.addEventListener('click', () => {
+    const isDark = root.getAttribute('data-theme') === 'dark';
+    root.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  });
+
+  // Background Animation
+  const canvas = document.getElementById('heartCanvas');
+  const ctx = canvas.getContext('2d');
+  function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  window.addEventListener('resize', resize); resize();
+
+  const hearts = Array.from({length: 20}, () => ({
+    x: Math.random() * innerWidth,
+    y: Math.random() * innerHeight,
+    size: Math.random() * 15 + 5,
+    speed: Math.random() * 0.5 + 0.2
+  }));
+
+  function drawHeart(x, y, size) {
+    ctx.fillStyle = '#ef4444';
+    ctx.globalAlpha = 0.1;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.bezierCurveTo(x, y-3, x-5, y-3, x-5, y);
+    ctx.bezierCurveTo(x-5, y+3, x, y+5, x, y+8);
+    ctx.bezierCurveTo(x, y+5, x+5, y+3, x+5, y);
+    ctx.bezierCurveTo(x+5, y-3, x, y-3, x, y);
+    ctx.fill();
+  }
+
+  function animate() {
+    ctx.clearRect(0,0, canvas.width, canvas.height);
+    hearts.forEach(h => {
+      h.y -= h.speed;
+      if(h.y < -10) h.y = canvas.height + 10;
+      drawHeart(h.x, h.y, h.size);
+    });
+    requestAnimationFrame(animate);
+  }
+  animate();
+</script>
+</body>
+</html>
